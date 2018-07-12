@@ -1,0 +1,118 @@
+Расположение компонента при вызове на страницу Контент->Новости->новости мои называется news.random
+Создаем свое пространство имен mycomponents куда копируем новый компонент news.random.
+Компонент, реализован на примере комплексного компонента news называется news.random
+Он позволяет, выводить список элементов с заданным названием, также выводится имя, фамилия, автора,
+ дата последнего изменения, код id автора, каждого элемента списка, также в детальном описание каждой статьи тоже выводится
+имя, фамилия, автора,код id
+Реализация компонента на основе news компонента, правим под себя.
+Как сделан:
+1. В файле description в лэнговом файле делаем правки:
+ <?
+$MESS ['IBLOCK_NEWS2_NAME'] = "Новости мои";
+$MESS ['IBLOCK_NEWS2_DESCRIPTION'] = "Новостной раздел мой";
+$MESS ['T_IBLOCK_DESC2_NEWS'] = "Новости мои";
+?>
+называем компонент "новости мои"
+В файле description.php делаем правки
+<?
+if (!defined("B_PROLOG_INCLUDED") || B_PROLOG_INCLUDED!==true) die();
+
+$arComponentDescription = array(
+	"NAME" => GetMessage("IBLOCK_NEWS2_NAME"),
+	"DESCRIPTION" => GetMessage("IBLOCK_NEWS2_DESCRIPTION"),
+	"ICON" => "/images/news_all.gif",
+	"COMPLEX" => "Y",
+	"PATH" => array(
+		"ID" => "content",
+		"CHILD" => array(
+			"ID" => "news",
+			"NAME" => GetMessage("T_IBLOCK_DESC_NEWS2"),
+			"SORT" => 10,
+			"CHILD" => array(
+				"ID" => "news_cmpx",
+			),
+		),
+	),
+);
+
+?>
+Далее в админ панеле выбираем свойства, которое будем выводить у элемента инфоблока, это
+-AUTOR (НЕ AUTHOR)-Автор-привязка к пользователю
+-PRIVYAZ-Привязка-привязка к элементу
+В элементе инфоблока выбираем эти свойства, которые хотим показать
+Заходим в файл news:list создаем там файлы
+result_modifier
+component_epilog
+остальные файлы там уже есть(template, .parameters)
+Выводим список элементов инфоблока:
+в result_modifier пишем метод
+-$APPLICATION -> SetTitle("Мой список1");
+в component_epilog кэшируем этот метод
+$APPLICATION->SetTitle("Мой список1");
+Теперь выводится название списка ( в настройках компонента, выключаем галочку вывод 
+заголовка)
+Далее, чтобы список выводил фио
+заходим в настройки компонента и включаем там поле :выводить ID кем создан(если id нам выводить не надо из шаблона этот блок удалим),
+ после чего в файл 
+result_modifier вставляем код:
+foreach($arResult['ITEMS'] as $key => $arItem){
+	$arUser = CUser::GetByID($arItem["FIELDS"]["CREATED_BY"]);
+	$user = $arUser->Fetch();
+	$arResult['ITEMS'][$key]["USER_NAME"] = $user["NAME"];
+	$arResult['ITEMS'][$key]["USER_LAST_NAME"] = $user["LAST_NAME"];
+}
+после этого в template можно вывести имя и фамилию $user["NAME"] и $user["LAST_NAME"]:
+                                <?if($arItem["USER_NAME"]):?>
+		Имя автора: <?=$arItem["USER_NAME"]?>
+		<?endif?><br />
+		<?if($arItem["USER_LAST_NAME"]):?>
+		Фамилия автора: <?=$arItem["USER_LAST_NAME"]?>
+		<?endif?><br />
+Дату последнего изменения можно вывезти через настройки компонента, там выбирается поле: дата последнего изменения и она выводится
+Привязку к элементу можно тоже вывести через настройки компонента, выбрав свойство:  PRIVYAZ
+Таким образом, в списке элементов, рядом с каждым выводится:
+-ID
+-ФИО
+-Дата последнего изменения
+-привязка к элементу
+Далее заходим в описание этого элемента и если хотим увидеть тоже чтобы там было ID, ФИО, Дата последнего изменения, привязка к элементу
+То заходим в папку news.detail и делаем там файлы:
+result_modifier
+component_epilog
+остальные файлы там уже есть(template, .parameters)
+В result_modifier для вывод ФИО и отправки его в кэш пишем код:
+$cp = $this->__component;
+if($arResult["PROPERTIES"]['AUTOR']['VALUE']) {
+$rsUser = CUser::GetByID($arResult["PROPERTIES"]['AUTOR']['VALUE']);
+$arUser = $rsUser->Fetch();
+$arResult['AUTOR'] = array($arUser["NAME"],$arUser["LAST_NAME"],$arUser["ID"]);
+
+$cp->SetResultCacheKeys(array("AUTOR"));
+
+}
+В template выводим его:
+foreach($arResult["DISPLAY_PROPERTIES"] as $pid=>$arProperty):?>
+
+		<?=$arProperty["NAME"]?>:&nbsp;
+		<?if($arResult["AUTOR"]):?>
+	<?=implode(",", $arResult["AUTOR"])?>
+		<?else:?>
+			<?=$arResult["AUTOR"];?>
+		<?endif?>
+		<br />
+	<?endforeach;
+И в настройках компонента указываем вывод свойства AUTOR
+В component_epilog кэшируем вывод фио:
+$str=$arParams["DATE_CREATE"].", ".implode(",", $arResult["AUTOR"]);
+Дату последнего изменения , для это в result_modifier:
+$arParams["DATE_CREATE"]="j F Y";
+CIBlockFormatProperties::DateFormat($arParams["DATE_CREATE"], MakeTimeStamp($arElement["DATE_CREATE"], CSite::GetDateFormat()));
+и выводим в template :
+<?if($arParams["DATE_CREATE"]):?>
+	Дата последнего изменения: <?=$arParams["DATE_CREATE"] = CIBlockFormatProperties::DateFormat($arParams["DATE_CREATE"], MakeTimeStamp($arElement["DATE_CREATE"], CSite::GetDateFormat()))?>
+	<?endif?>
+Таким образом в детальном описании вывелось: фио, id, дата последнего изменения.
+Методы, которые использовались:
+ SetTitle - вывод названия списка
+GetByID- вывод данных по id юзера
+CIBlockFormatProperties::DateFormat- вывод свойства даты
